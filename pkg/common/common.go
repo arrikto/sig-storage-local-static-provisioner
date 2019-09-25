@@ -117,6 +117,8 @@ type MountConfig struct {
 	HostDir string `json:"hostDir" yaml:"hostDir"`
 	// The mount point of the hostpath volume
 	MountDir string `json:"mountDir" yaml:"mountDir"`
+	// The directory inside the volume used by the PersistentVolume
+	SubDir string `json:"subDir" yaml:"subDir"`
 	// The type of block cleaner to use
 	BlockCleanerCommand []string `json:"blockCleanerCommand" yaml:"blockCleanerCommand"`
 	// The volume mode of created PersistentVolume object,
@@ -331,10 +333,11 @@ func ConfigMapDataToVolumeConfig(data map[string]string, provisionerConfig *Prov
 		}
 
 		provisionerConfig.StorageClassConfig[class] = config
-		klog.Infof("StorageClass %q configured with MountDir %q, HostDir %q, VolumeMode %q, FsType %q, BlockCleanerCommand %q",
+		klog.Infof("StorageClass %q configured with MountDir %q, HostDir %q, SubDir %q, VolumeMode %q, FsType %q, BlockCleanerCommand %q",
 			class,
 			config.MountDir,
 			config.HostDir,
+			config.SubDir,
 			config.VolumeMode,
 			config.FsType,
 			config.BlockCleanerCommand)
@@ -408,6 +411,9 @@ func GenerateMountName(mount *MountConfig) string {
 	h := fnv.New32a()
 	h.Write([]byte(mount.HostDir))
 	h.Write([]byte(mount.MountDir))
+	if mount.SubDir != "" {
+		h.Write([]byte(mount.SubDir))
+	}
 	return fmt.Sprintf("mount-%x", h.Sum32())
 }
 

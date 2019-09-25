@@ -285,7 +285,7 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 			continue
 		}
 		// Check if PV already exists for it
-		pvName := generatePVName(file, d.Node.Name, class)
+		pvName := generatePVName(file, config.SubDir, d.Node.Name, class)
 		pv, exists := d.Cache.GetPV(pvName)
 		if exists {
 			if pv.Spec.VolumeMode != nil && *pv.Spec.VolumeMode == v1.PersistentVolumeBlock &&
@@ -356,18 +356,21 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 	return fmt.Errorf("%d error(s) while discovering volumes: %v", len(discoErrors), discoErrors)
 }
 
-func generatePVName(file, node, class string) string {
+func generatePVName(file, subDir, node, class string) string {
 	h := fnv.New32a()
 	h.Write([]byte(file))
 	h.Write([]byte(node))
 	h.Write([]byte(class))
+	if subDir != "" {
+		h.Write([]byte(subDir))
+	}
 	// This is the FNV-1a 32-bit hash
 	return fmt.Sprintf("local-pv-%x", h.Sum32())
 }
 
 func (d *Discoverer) createPV(file, class string, reclaimPolicy v1.PersistentVolumeReclaimPolicy, mountOptions []string, config common.MountConfig, capacityByte int64, volMode v1.PersistentVolumeMode, startTime time.Time) error {
-	pvName := generatePVName(file, d.Node.Name, class)
-	outsidePath := filepath.Join(config.HostDir, file)
+	pvName := generatePVName(file, config.SubDir, d.Node.Name, class)
+	outsidePath := filepath.Join(config.HostDir, file, config.SubDir)
 
 	klog.Infof("Found new volume at host path %q with capacity %d, creating Local PV %q, required volumeMode %q",
 		outsidePath, capacityByte, pvName, volMode)

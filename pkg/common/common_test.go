@@ -104,6 +104,7 @@ func TestLoadProvisionerConfigs(t *testing.T) {
 				"storageClassMap": `local-storage:
    hostDir: /mnt/disks
    mountDir: /mnt/disks
+   subDir: data
    blockCleanerCommand:
      - "/scripts/shred.sh"
      - "2"
@@ -118,6 +119,7 @@ func TestLoadProvisionerConfigs(t *testing.T) {
 					"local-storage": {
 						HostDir:             "/mnt/disks",
 						MountDir:            "/mnt/disks",
+						SubDir:              "data",
 						BlockCleanerCommand: []string{"/scripts/shred.sh", "2"},
 						VolumeMode:          "Filesystem",
 						FsType:              "ext4",
