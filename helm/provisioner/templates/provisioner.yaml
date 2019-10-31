@@ -123,6 +123,8 @@ spec:
               readOnly: true
             - mountPath: /dev
               name: provisioner-dev
+            - mountPath: /run/udev
+              name: provisioner-udev
             {{- range $classConfig := .Values.classes }}
             - mountPath: {{ if $classConfig.mountDir }} {{- $classConfig.mountDir -}} {{ else }} {{- $classConfig.hostDir -}} {{ end }}
               name: {{ $classConfig.name }}
@@ -135,6 +137,9 @@ spec:
         - name: provisioner-dev
           hostPath:
             path: /dev
+        - name: provisioner-udev
+          hostPath:
+            path: /run/udev
         {{- range $classConfig := .Values.classes }}
         - name: {{ $classConfig.name }}
           hostPath:
@@ -151,7 +156,7 @@ metadata:
   name: {{ $val.name }}
   {{- if kindIs "map" $val.storageClass }}
   {{- if $val.storageClass.isDefaultClass }}
-  annotations:  
+  annotations:
     storageclass.kubernetes.io/is-default-class: "true"
   {{- end }}
   {{- end }}

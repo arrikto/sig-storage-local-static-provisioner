@@ -34,7 +34,8 @@ RUN apt-get update \
     && clean-install \
     util-linux \
     e2fsprogs \
-    bash
+    bash \
+    udev
 
 COPY --from=builder /go/src/sigs.k8s.io/sig-storage-local-static-provisioner/_output/${OS}/${ARCH}/local-volume-provisioner /local-provisioner
 ADD deployment/docker/scripts /scripts
