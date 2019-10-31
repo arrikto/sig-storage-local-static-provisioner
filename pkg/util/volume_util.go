@@ -46,11 +46,19 @@ type VolumeUtil interface {
 
 	// Get capacity of the block device
 	GetBlockCapacityByte(fullPath string) (int64, error)
+
+	// Get Mount Point Attributes for the specific device
+	GetFilesystemAttributes(fullPath string) (*FilesystemAttrs, error)
 }
 
 var _ VolumeUtil = &volumeUtil{}
 
 type volumeUtil struct{}
+
+type FilesystemAttrs struct {
+	UUID  string
+	Label string
+}
 
 // NewVolumeUtil returns a VolumeUtil object for performing local filesystem operations
 func NewVolumeUtil() VolumeUtil {
@@ -255,4 +263,10 @@ func (u *FakeVolumeUtil) AddNewDirEntries(mountDir string, dirFiles map[string][
 		klog.Infof("Adding to directory %q: files %v\n", dir, files)
 		u.directoryFiles[mountedPath] = append(curFiles, files...)
 	}
+}
+
+// GetFilesystemAttrs
+func (u *FakeVolumeUtil) GetFilesystemAttributes(fullPath string) (*FilesystemAttrs, error) {
+
+	return nil, nil
 }

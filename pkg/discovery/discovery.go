@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"net/http"
 	"path/filepath"
 	"sync"
@@ -269,10 +270,9 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 		return fmt.Errorf("error retrieving mountpoints: %v", err)
 	}
 	// Put mount points into set for faster checks below
-	type empty struct{}
-	mountPointMap := make(map[string]empty)
+	mountPointMap := make(map[string]mount.MountPoint)
 	for _, mp := range mountPoints {
-		mountPointMap[mp.Path] = empty{}
+		mountPointMap[mp.Path] = mp
 	}
 
 	var discoErrors []error
@@ -313,6 +313,7 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 		}
 
 		var capacityByte int64
+		var labels map[string]string
 		desireVolumeMode := v1.PersistentVolumeMode(config.VolumeMode)
 		switch volMode {
 		case v1.PersistentVolumeBlock:
@@ -340,12 +341,24 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 				discoErrors = append(discoErrors, fmt.Errorf("path %q fs stats error: %v", filePath, err))
 				continue
 			}
+			// Get Filesystem attributes
+			devPath := mountPointMap[filePath].Device
+			fsAttrs, err := d.VolUtil.GetFilesystemAttributes(devPath)
+			if err != nil {
+				discoErrors = append(discoErrors, fmt.Errorf("path %q fs attrs error: %v", devPath, err))
+				continue
+			}
+			labels = map[string]string{
+				"fs-uuid":  fsAttrs.UUID,
+				"fs-label": fsAttrs.Label,
+			}
+
 		default:
 			discoErrors = append(discoErrors, fmt.Errorf("path %q has unexpected volume type %q", filePath, volMode))
 			continue
 		}
 
-		err = d.createPV(file, class, reclaimPolicy, mountOptions, config, capacityByte, desireVolumeMode, startTime)
+		err = d.createPV(file, class, reclaimPolicy, mountOptions, config, capacityByte, desireVolumeMode, startTime, labels)
 		if err != nil {
 			discoErrors = append(discoErrors, err)
 		}
@@ -365,12 +378,17 @@ func generatePVName(file, node, class string) string {
 	return fmt.Sprintf("local-pv-%x", h.Sum32())
 }
 
-func (d *Discoverer) createPV(file, class string, reclaimPolicy v1.PersistentVolumeReclaimPolicy, mountOptions []string, config common.MountConfig, capacityByte int64, volMode v1.PersistentVolumeMode, startTime time.Time) error {
+func (d *Discoverer) createPV(file, class string, reclaimPolicy v1.PersistentVolumeReclaimPolicy, mountOptions []string, config common.MountConfig, capacityByte int64, volMode v1.PersistentVolumeMode, startTime time.Time, labels map[string]string) error {
 	pvName := generatePVName(file, d.Node.Name, class)
 	outsidePath := filepath.Join(config.HostDir, file)
 
 	klog.Infof("Found new volume at host path %q with capacity %d, creating Local PV %q, required volumeMode %q",
 		outsidePath, capacityByte, pvName, volMode)
+
+	pvLabels := d.Labels
+	for k, v := range labels {
+		pvLabels[k] = v
+	}
 
 	localPVConfig := &common.LocalPVConfig{
 		Name:            pvName,
@@ -380,7 +398,7 @@ func (d *Discoverer) createPV(file, class string, reclaimPolicy v1.PersistentVol
 		ReclaimPolicy:   reclaimPolicy,
 		ProvisionerName: d.Name,
 		VolumeMode:      volMode,
-		Labels:          d.Labels,
+		Labels:          pvLabels,
 		MountOptions:    mountOptions,
 		SetPVOwnerRef:   d.SetPVOwnerRef,
 		OwnerReference:  d.ownerReference,

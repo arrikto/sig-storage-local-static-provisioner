@@ -19,7 +19,10 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"os"
+	"os/exec"
+	"strings"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -53,4 +56,43 @@ func (u *volumeUtil) IsBlock(fullPath string) (bool, error) {
 	}
 
 	return (st.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
+}
+
+func (u *volumeUtil) GetFilesystemAttributes(deviceFullPath string) (*FilesystemAttrs, error) {
+
+	// Call udevadm to get property data for the device
+	data, err := exec.Command(
+		"udevadm",
+		[]string{"info", "-q", "property", deviceFullPath}...,
+	).Output()
+	if err != nil {
+		return nil, err
+	}
+
+	properties, err := parseUdevPropertyData(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return &FilesystemAttrs{
+		UUID:  properties["ID_FS_UUID"],
+		Label: properties["ID_FS_LABEL"],
+	}, nil
+}
+
+func parseUdevPropertyData(data []byte) (map[string]string, error) {
+
+	res := map[string]string{}
+	lines := strings.Split(string(data), "\n")
+	for _, l := range lines {
+		if len(l) == 0 {
+			continue
+		}
+		parts := strings.Split(l, "=")
+		if len(parts) != 2 {
+			return nil, errors.New("error parsing udev property data, expected format <name>=<value>")
+		}
+		res[parts[0]] = parts[1]
+	}
+	return res, nil
 }
